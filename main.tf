@@ -13,6 +13,7 @@ resource "vultr_instance" "todo" {
   enable_private_network = false
   hostname = local.app
   tag = local.app
+  label = local.app
   # script_id =
   # ssh_key_ids =
 }
