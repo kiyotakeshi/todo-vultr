@@ -37,6 +37,16 @@ $ vultr-cli os list | grep -i "centos 8"
 401	CentOS 8 Stream x64	x64	centos
 ```
 
+## Create ssh key pair
+
+```shell
+ssh-keygen -m PEM -t rsa -b 2048 -f todo_key -C ""
+
+# using .pub key in main.tf
+$ ls todo_key*
+todo_key	todo_key.pub
+```
+
 ---
 ## Create component
 
