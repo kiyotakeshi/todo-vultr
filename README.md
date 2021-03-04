@@ -314,17 +314,140 @@ vultr-cli snapshot create -i abcdefgh-1234-5678-abcd-efghijklmnnp -d "finish set
 vultr-cli snapshot list
 ```
 
+## Create server from snapshot
+
+```shell
+vultr-cli snapshot list
+
+vultr-cli instance create \
+--snapshot "615aae20-2b4e-4d03-9131-fab98490df15" \
+--region "nrt" --plan "vc2-1c-1gb"
+
+vultr-cli instance list
+```
+
 ---
 ## Deploy Todo application
+
+- install and setup nginx
 
 ```shell
 sudo su -
 
-yum install git
+yum install -y nginx
 
-git --version
+# cat > /etc/nginx/default.d/reverse_proxy.conf <<EOF
+location / {
+    proxy_pass http://localhost:8081/;
+    proxy_redirect off;
+}
+EOF
 
+cp /etc/nginx/nginx.conf{,.old}
 
+vi /etc/nginx/nginx.conf
+
+# diff /etc/nginx/nginx.conf /etc/nginx/nginx.conf.old
+46a47,49
+>         location / {
+>         }
+>
+
+systemctl start nginx
+
+# systemctl is-active nginx
+active
+
+systemctl enable nginx
+
+```
+
+- install java
+
+```shell
+yum install -y java-11-openjdk
+
+# java -version
+openjdk version "11.0.9.1" 2020-11-04 LTS
+OpenJDK Runtime Environment 18.9 (build 11.0.9.1+1-LTS)
+OpenJDK 64-Bit Server VM 18.9 (build 11.0.9.1+1-LTS, mixed mode, sharing)
+```
+
+- install and setup postgresql
+
+```shell
+# dnf -y install https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+
+rpm -qi pgdg-redhat-repo
+
+dnf module disable postgresql -y
+
+dnf install postgresql11-server postgresql11 -y
+
+postgresql-11-setup initdb
+
+systemctl start postgresql-11
+
+systemctl enable postgresql-11
+
+su - postgres
+
+psql
+
+create database todo;
+
+alter user postgres with password 'password';
+
+\l
+
+exit
+
+cp /var/lib/pgsql/11/data/pg_hba.conf{,.old}
+
+ls /var/lib/pgsql/11/data/pg_hba.conf*
+
+vi /var/lib/pgsql/11/data/pg_hba.conf
+
+# diff /var/lib/pgsql/11/data/pg_hba.conf /var/lib/pgsql/11/data/pg_hba.conf.old
+82c82
+< host    all             all             127.0.0.1/32            md5
+---
+> host    all             all             127.0.0.1/32            ident
+
+systemctl restart postgresql-11
+```
+
+- transfer artifact o server
+
+```shell
+./mvnw clean package
+
+scp -P 123456 -i todo-user.pem ~/todo/target/todo-1.1.1.jar todo@123.456.789.101:~/
+```
+
+- open firewall for http access
+
+```shell
+# firewall-cmd --permanent --zone public --add-service http
+success
+
+# firewall-cmd --reload
+success
+
+firewall-cmd --info-zone public
+```
+
+- permit reverse proxy nginx traffic
+    - avoid following nginx error `failed (13: Permission denied) while connecting to upstream`
+
+```shell
+setsebool -P httpd_can_network_connect 1
+```
+
+## Run Application
+
+```shell
+nohup java -jar todo-1.1.1.jar &
 ```
 
 ---
