@@ -450,6 +450,112 @@ setsebool -P httpd_can_network_connect 1
 nohup java -jar todo-1.1.1.jar &
 ```
 
+## Set up TLS using Let's encrypt
+
+```shell
+dnf install epel-release
+
+dnf install certbot python3-certbot-nginx
+
+certbot certonly --nginx
+
+certbot renew --dry-run
+
+certbot certificates
+
+# EOF までコピー
+# cat > /etc/nginx/nginx.conf <<EOF
+user nginx;
+worker_processes auto;
+error_log /var/log/nginx/error.log;
+pid /run/nginx.pid;
+
+# Load dynamic modules. See /usr/share/doc/nginx/README.dynamic.
+include /usr/share/nginx/modules/*.conf;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log  /var/log/nginx/access.log  main;
+
+    sendfile            on;
+    tcp_nopush          on;
+    tcp_nodelay         on;
+    keepalive_timeout   65;
+    types_hash_max_size 2048;
+
+    include             /etc/nginx/mime.types;
+    default_type        application/octet-stream;
+
+    # Load modular configuration files from the /etc/nginx/conf.d directory.
+    # See http://nginx.org/en/docs/ngx_core_module.html#include
+    # for more information.
+    include /etc/nginx/conf.d/*.conf;
+
+    server {
+
+        # redirect http -> https
+        if ($host = www.bullstechnology.com) {
+            return 301 https://$host$request_uri;
+        } # managed by Certbot
+
+        listen       80 default_server;
+        listen       [::]:80 default_server;
+        server_name  localhost;
+        root         /usr/share/nginx/html;
+
+        # load reverse proxy related conf
+        include /etc/nginx/default.d/*.conf;
+
+        error_page 404 /404.html;
+            location = /40x.html {
+        }
+
+        error_page 500 502 503 504 /50x.html;
+            location = /50x.html {
+        }
+    }
+
+# Settings for a TLS enabled server.
+    server {
+         server_name www.bullstechnology.com;
+         root         /usr/share/nginx/html;
+         listen [::]:443 ssl ipv6only=on;
+         listen 443 ssl;
+         ssl_certificate /etc/letsencrypt/live/www.bullstechnology.com/fullchain.pem;
+         ssl_certificate_key /etc/letsencrypt/live/www.bullstechnology.com/privkey.pem;
+         include /etc/letsencrypt/options-ssl-nginx.conf;
+         ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+         # load reverse proxy related conf
+         include /etc/nginx/default.d/*.conf;
+
+         error_page 404 /404.html;
+             location = /40x.html {
+         }
+
+         error_page 500 502 503 504 /50x.html;
+             location = /50x.html {
+         }
+   }
+}
+EOF
+
+# firewall-cmd --permanent --zone public --add-service https
+success
+
+# firewall-cmd --reload
+success
+
+systemctl restart nginx
+```
+
 ---
 ## Delete component
 
