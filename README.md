@@ -554,6 +554,12 @@ success
 success
 
 systemctl restart nginx
+
+
+crontab -e
+
+# crontab -l
+0 5 1 * * /usr/bin/certbot renew && /bin/systemctl reload nginx
 ```
 
 ---
